@@ -3,7 +3,8 @@ import { pause } from './util.js';
 
 /** @import { Order, Bot } from './objects.js' */
 
-const NEW_ITEM_PAUSE_MS = 500;
+
+const PICKUP_ORDER_DELAY_MS = 500;
 
 /** @type {HTMLElement} */ const $pendingArea = document.getElementById('pendingArea');
 /** @type {HTMLElement} */ const $processingArea = document.getElementById('processingArea');
@@ -12,16 +13,18 @@ const NEW_ITEM_PAUSE_MS = 500;
 /** @type {HTMLElement} */ const $botTemplate = document.getElementById('bot-');
 
 /**
- * Handle DOM element operations.
+ * Handles DOM element operations.
+ * Used for manipulating UI compontents to reflect state of business objects.
  */
 const UI = {
   /** @typedef {HTMLElement & { $orderSlot: HTMLElement }} BotElement */
 
   /**
+   * Create an order item and place it in the pending area.
    * @param {Order} order
    * @returns {Promise<HTMLElement>}
    */
-  addOrderElement(order) {
+  addOrderItem(order) {
     /** @type {HTMLElement} */
     const $order = $orderTemplate.cloneNode(true);
     $order.id = `order-${order.id}`;
@@ -35,17 +38,20 @@ const UI = {
   },
 
   /**
+   * Move order item to a bot item, the pending area or the completed area.
    * @param {Order} order
-   * @param {Bot | Array} destination
+   * @param {Bot | Order[]} destination
    * @returns {Promise<HTMLElement>}
    */
-  async moveOrderElement(order, destination) {
+  async moveOrderItem(order, destination) {
     /** @type {HTMLElement} */
     const $order = document.getElementById(`order-${order.id}`);
     if (destination instanceof Bot) {
       /** @type {BotElement} */
       const $bot = document.getElementById(`bot-${destination.id}`);
-      await pause(NEW_ITEM_PAUSE_MS);
+      // Slight delay allows progress-bars to reset correctly between order item releases and pickups
+      // Also makes multiple order item movements visually easier to follow
+      await pause(PICKUP_ORDER_DELAY_MS);
       $bot.$orderSlot.append($order);
       return $bot;
     }
@@ -60,10 +66,11 @@ const UI = {
   },
 
   /**
+   * Create bot item and place it in the bot area.
    * @param {Bot} bot
    * @returns {BotElement}
    */
-  addBotElement(bot) {
+  addBotItem(bot) {
     /** @type {BotElement} */
     const $bot = $botTemplate.cloneNode(true);
     $bot.id = `bot-${bot.id}`;
@@ -74,13 +81,17 @@ const UI = {
   },
 
   /**
+   * Remove the associated bot item.
    * @param {Bot} bot
    */
-  removeBotElement(bot) {
+  removeBotItem(bot) {
     const $bot = document.getElementById(`bot-${bot.id}`);
     $bot.remove();
   },
 }
+
+
+//--- Event listeners ---//
 
 document.body.addEventListener('click', handleClick);
 document.body.addEventListener('order:complete', handleCompleteOrder);
@@ -108,11 +119,24 @@ function handleClick({ target }) {
 }
 
 /**
+ * @param {object} event
+ * @param {Order} event.order
+ * @param {Bot} event.bot
+ */
+async function handleCompleteOrder({ order, bot }) {
+  await UI.moveOrderItem(order, Orders.completed);
+  runPickupOrder(bot);
+}
+
+
+//--- Actions ---//
+
+/**
  * @param {any} [vip]
  */
 function runAddOrder(vip = '') {
   const order = vip ? Orders.addVIP() : Orders.add();
-  UI.addOrderElement(order);
+  UI.addOrderItem(order);
   const bot = BotStaff.findIdle();
   if (bot) {
     runPickupOrder(bot);
@@ -125,7 +149,7 @@ function runAddOrder(vip = '') {
 async function runPickupOrder(bot) {
   bot.pickupOrder();
   if (bot.order) {
-    await UI.moveOrderElement(bot.order, bot);
+    await UI.moveOrderItem(bot.order, bot);
   }
 }
 
@@ -134,24 +158,14 @@ async function runPickupOrder(bot) {
  */
 function runAddBot() {
   const bot = BotStaff.add();
-  UI.addBotElement(bot);
+  UI.addBotItem(bot);
   return bot;
 }
 
 function runRemoveBot() {
   const [bot, order] = BotStaff.remove();
   if (order) {
-    UI.moveOrderElement(order, Orders.pending);
+    UI.moveOrderItem(order, Orders.pending);
   }
-  UI.removeBotElement(bot);
-}
-
-/**
- * @param {object} event
- * @param {Order} event.order
- * @param {Bot} event.bot
- */
-async function handleCompleteOrder({ order, bot }) {
-  await UI.moveOrderElement(order, Orders.completed);
-  runPickupOrder(bot);
+  UI.removeBotItem(bot);
 }
