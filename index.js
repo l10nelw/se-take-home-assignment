@@ -14,7 +14,7 @@ const PICKUP_ORDER_DELAY_MS = 500;
 
 /**
  * Handles DOM element operations.
- * Used for manipulating UI compontents to reflect state of business objects.
+ * Used for manipulating UI components to reflect state of business objects.
  */
 const UI = {
   /** @typedef {HTMLElement & { $orderSlot: HTMLElement }} BotElement */
@@ -22,7 +22,7 @@ const UI = {
   /**
    * Create an order item and place it in the pending area.
    * @param {Order} order
-   * @returns {Promise<HTMLElement>}
+   * @returns {HTMLElement}
    */
   addOrderItem(order) {
     /** @type {HTMLElement} */
